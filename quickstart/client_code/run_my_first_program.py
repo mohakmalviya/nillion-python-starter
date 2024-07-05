@@ -83,7 +83,6 @@ async def main():
     # Create a secret named "Rating1" and "Rating2" with any value, ex: 5 and 7
     rating_secret = nillion.NadaValues(
         {
-            "Rating1": nillion.SecretInteger(5),
             "Rating2": nillion.SecretInteger(7),
         }
     )
