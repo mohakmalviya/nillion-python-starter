@@ -2,11 +2,10 @@ from nada_dsl import *
 
 def nada_main():
     party1 = Party(name="Party1")
-    party2 = Party(name="Party2")
     central_server = Party(name="CentralServer")
 
     rating1 = SecretInteger(Input(name="Rating1", party=party1))
-    rating2 = SecretInteger(Input(name="Rating2", party=party2))
+    rating2 = SecretInteger(Input(name="Rating2", party=party1))
 
     movies = ["MovieA", "MovieB", "MovieC"]
 
@@ -33,11 +32,10 @@ def nada_main():
         return SecretInteger(Input(name="ConstantZero", party=central_server)) - squared_difference
 
     similarities = [
-        secure_similarity(rating1, SecretInteger(Input(name=f"MovieRating_{movie}", party=central_server)))
+        secure_similarity(rating2, SecretInteger(Input(name=f"MovieRating_{movie}", party=central_server)))
         for movie in movies
     ]
 
     output_similarities = [Output(sim, f"Similarity_{i}", central_server) for i, sim in enumerate(similarities)]
 
     return output_similarities
-

@@ -80,16 +80,17 @@ async def main():
     print("Stored program_id:", program_id)
 
     # 4. Create the 1st secret, add permissions, pay for and store it in the network
-    # Create a secret named "Rating1" with any value, ex: 5
-    rating1_secret = nillion.NadaValues(
+    # Create a secret named "Rating1" and "Rating2" with any value, ex: 5 and 7
+    rating_secret = nillion.NadaValues(
         {
             "Rating1": nillion.SecretInteger(5),
+            "Rating2": nillion.SecretInteger(7),
         }
     )
 
     # Set the input party for the secret
-    # The party name needs to match the party name that is storing "Rating1" in the program
-    party_name = "Party1"
+    # The party name needs to match the party name that is storing "Rating1" and "Rating2" in the program
+    party1_name = "Party1"
 
     # Set permissions for the client to compute on the program
     permissions = nillion.Permissions.default_for_user(client.user_id)
@@ -98,31 +99,56 @@ async def main():
     # Pay for and store the secret in the network and print the returned store_id
     receipt_store = await get_quote_and_pay(
         client,
-        nillion.Operation.store_values(rating1_secret, ttl_days=5),
+        nillion.Operation.store_values(rating_secret, ttl_days=5),
         payments_wallet,
         payments_client,
         cluster_id,
     )
     # Store a secret
     store_id = await client.store_values(
-        cluster_id, rating1_secret, permissions, receipt_store
+        cluster_id, rating_secret, permissions, receipt_store
     )
+    
     print(f"Computing using program {program_id}")
     print(f"Use secret store_id: {store_id}")
 
-    # 5. Create compute bindings to set input and output parties, add a computation time secret and pay for & run the computation
-    compute_bindings = nillion.ProgramBindings(program_id)
-    compute_bindings.add_input_party(party_name, party_id)
-    compute_bindings.add_output_party(party_name, party_id)
-    compute_bindings.add_input_party("CentralServer", party_id)  # Ensure CentralServer is bound as an input party
+    # Add the required inputs from the CentralServer
+    central_server_inputs = nillion.NadaValues(
+        {
+            "ConstantZero": nillion.SecretInteger(1),
+            "MovieRating_MovieA": nillion.SecretInteger(8),
+            "MovieRating_MovieB": nillion.SecretInteger(6),
+            "MovieRating_MovieC": nillion.SecretInteger(7),
+        }
+    )
 
-    # Add Rating2, the 2nd secret at computation time
-    computation_time_secrets = nillion.NadaValues({"Rating2": nillion.SecretInteger(7)})
+    # Set permissions for the client to compute on the program
+    permissions_central_server = nillion.Permissions.default_for_user(client.user_id)
+    permissions_central_server.add_compute_permissions({client.user_id: {program_id}})
+
+    # Pay for and store the central server inputs in the network and print the returned store_id
+    receipt_store_central_server = await get_quote_and_pay(
+        client,
+        nillion.Operation.store_values(central_server_inputs, ttl_days=5),
+        payments_wallet,
+        payments_client,
+        cluster_id,
+    )
+    store_id_central_server = await client.store_values(
+        cluster_id, central_server_inputs, permissions_central_server, receipt_store_central_server
+    )
+    print(f"Stored central server inputs. Store ID: {store_id_central_server}")
+
+    # 5. Create compute bindings to set input and output parties and pay for & run the computation
+    compute_bindings = nillion.ProgramBindings(program_id)
+    compute_bindings.add_input_party(party1_name, party_id)
+    compute_bindings.add_input_party("CentralServer", party_id)  # Ensure CentralServer is bound as an input party
+    compute_bindings.add_output_party("CentralServer", party_id)  # Ensure CentralServer is bound as an output party
 
     # Pay for the compute
     receipt_compute = await get_quote_and_pay(
         client,
-        nillion.Operation.compute(program_id, computation_time_secrets),
+        nillion.Operation.compute(program_id, nillion.NadaValues({})),  # Provide an empty values argument
         payments_wallet,
         payments_client,
         cluster_id,
@@ -132,8 +158,8 @@ async def main():
     compute_id = await client.compute(
         cluster_id,
         compute_bindings,
-        [store_id],
-        computation_time_secrets,
+        [store_id, store_id_central_server],
+        nillion.NadaValues({}),  # No additional computation time secrets
         receipt_compute,
     )
 
